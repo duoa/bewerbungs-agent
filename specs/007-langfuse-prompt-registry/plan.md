@@ -1,0 +1,88 @@
+# Implementation Plan: Langfuse Prompt Registry & Sync
+
+**Branch**: `007-langfuse-prompt-registry` | **Date**: 2026-05-13 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/007-langfuse-prompt-registry/spec.md`
+
+## Summary
+
+Add a small `prompt_registry` module that owns the canonical stage-to-prompt mapping and a thin Pydantic API on top of Langfuse Prompt Management. Two CLI subcommands (`jobagent prompts sync` and `jobagent prompts list`) discover every local prompt file, compute the same SHA-256 prefix used by feature 006's `_compute_prompt_hash`, compare to the latest Langfuse version, and create a new version (with metadata + label) only when content has changed. A runtime resolver — invoked from feature 006's `_wrap_stage` helper — looks up `(prompt_name, local_hash) → langfuse_version` once per process and caches the result, so each LLM stage span carries `prompt_name` + `prompt_version` (or `prompt_version=unsynced`) without per-call network cost. Local files stay canonical: the runtime never substitutes a Langfuse-fetched prompt. When Langfuse credentials are missing, the sync command exits non-zero with a clear message, list runs locally-only, and the runtime falls back silently — exactly the feature 006 posture.
+
+## Technical Context
+
+**Language/Version**: Python 3.11 (matches `pyproject.toml`, mypy strict)
+**Primary Dependencies**: `langfuse>=2.0` (already in pyproject from feature 006; uses the new prompt-management surface: `create_prompt`, `get_prompt`, `update_prompt`), `pydantic>=2.0`, `typer>=0.12`. No new dependencies required.
+**Storage**: Local prompt files under `prompts/` (existing source of truth); Langfuse Prompt Management for version tracking (operator-provided remote). No new local persistence.
+**Testing**: `pytest>=8.0`, `pytest-mock>=3.0` (existing). New unit-test files: `tests/unit/test_prompt_registry.py` and `tests/unit/test_cli_prompts.py`.
+**Target Platform**: macOS / Linux CLI; Python 3.11. Same as the rest of the project.
+**Project Type**: Single-project CLI (Option 1).
+**Performance Goals**:
+- `jobagent prompts sync` completes in ≤ 10 s for ≤ 20 prompts on a healthy connection (SC-001).
+- Runtime stage spans incur 0 additional per-call network round-trips after the first lookup (FR-018).
+- `jobagent prompts list` returns in ≤ 2 s on a healthy connection.
+**Constraints**:
+- Outputs MUST remain byte-identical to runs before this feature on the same inputs — same invariant as feature 006 FR-013 (no generation behaviour change).
+- Privacy defaults from feature 006 remain in force: no raw CV / profile / job / letter prose on spans regardless of synced state (FR-019, SC-008).
+- A network or auth failure in the sync command MUST NOT corrupt local files; partial sync state MUST be safe to retry (FR-011).
+- The runtime feature MUST NOT add a Langfuse dependency to pipeline execution: missing credentials = runtime keeps loading from local files exactly as today (FR-016).
+
+**Scale/Scope**: Currently ~10 prompt files (planner, writer, hiring_reviewer, requirements, evidence, tailor_cv, targeted_rewriter, validator, system, styles/standard, styles/aida). Up to 20 envisioned for v1.
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-checked after Phase 1 design.*
+
+| Principle | Status | Note |
+|-----------|--------|------|
+| I. Factual Integrity (NON-NEGOTIABLE) | PASS | Registry has no role in claim selection or generation. Outputs MUST stay byte-identical (test enforced; same invariant as feature 006 FR-013). |
+| II. Approved Sources Only | PASS | Prompts are part of the existing approved set; no new source documents introduced. The registry is metadata-on-top, not a new content source. |
+| III. Structured-Before-Generative Workflow | PASS | Sync command is offline / out-of-band. Pipeline stage order unchanged. Runtime resolver is read-only and side-effect-free. |
+| IV. Separation of Concerns | PASS | All registry logic lives in `utils/prompt_registry.py`. Stage modules are not touched. CLI surface is one new subcommand group. |
+| V. Deterministic Interfaces & Typed State | PASS | `PromptTemplateRecord`, `SyncResult`, `PromptReference` are Pydantic models with `extra="forbid"`. Runtime resolver returns typed records, never untyped dicts. |
+| VI. Test Coverage | PASS | Spec FR-021..FR-026 enumerate the six required test scenarios. TDD: tests written before implementation; mocked Langfuse client avoids any network in unit tests. |
+
+**Result**: All gates pass. Complexity Tracking table empty.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/007-langfuse-prompt-registry/
+├── plan.md              # this file
+├── research.md          # Phase 0 output
+├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output
+├── contracts/           # Phase 1 output
+│   └── prompt_registry_api.md
+├── checklists/
+│   └── requirements.md  # from /speckit.specify
+└── tasks.md             # generated by /speckit.tasks (NOT in this command)
+```
+
+### Source Code (repository root)
+
+Single-project layout reused. No new top-level directories. New files marked **[NEW]**; modified files marked **[MOD]**.
+
+```text
+src/bewerbungs_agent/
+├── cli.py                              [MOD] add `prompts` sub-Typer with `sync` + `list` commands
+├── graph/
+│   └── workflow.py                     [MOD] import STAGE_PROMPT_MAP from prompt_registry; drop the inline prompt_name strings (single source of truth)
+└── utils/
+    ├── observability.py                [MOD] _wrap_stage attaches prompt_name + prompt_version via PromptRegistry.runtime_reference(...)
+    ├── prompt_registry.py              [NEW] discovery, hashing, sync, list, runtime resolver, in-process version cache, Pydantic records
+    └── prompts.py                      — (unchanged — still loads files from disk; remains canonical)
+
+tests/
+├── unit/
+│   ├── test_prompt_registry.py        [NEW] discovery, hash stability, sync idempotence, changed-version creation, no-creds no-op, runtime resolution
+│   └── test_cli_prompts.py            [NEW] sync exits non-zero w/o creds, list runs locally w/o creds, sync exits 0 with mocked client, table + --json output shapes
+└── integration/
+    └── test_full_run.py               [MOD] extend the existing observability test to assert prompt_name + prompt_version land on stage spans when registry is wired
+```
+
+**Structure Decision**: One cohesive module (`utils/prompt_registry.py`) — same pattern as feature 006's `utils/observability.py`. The single-file choice keeps the diff focused and matches the user's "small prompt_registry module" framing. The stage-to-prompt mapping becomes a module-level constant (`STAGE_PROMPT_MAP`) imported by both `graph/workflow.py` (for node wrapping) and the registry itself (for discovery) — single source of truth, no duplicated list (FR-001 invariant).
+
+## Complexity Tracking
+
+> No constitution violations. Section intentionally empty.

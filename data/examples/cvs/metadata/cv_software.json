@@ -1,0 +1,8 @@
+{
+  "variant_id": "cv_software",
+  "file_path": "cv_software.md",
+  "role_families": ["software-engineering", "backend", "data-engineering"],
+  "skills": ["Python", "SQL", "FastAPI", "Apache Spark", "dbt", "Airflow", "Docker", "Kubernetes"],
+  "tools": ["pytest", "git", "PostgreSQL"],
+  "summary": "8 years Python backend + data pipelines. Senior Data Engineer at DataStream GmbH."
+}

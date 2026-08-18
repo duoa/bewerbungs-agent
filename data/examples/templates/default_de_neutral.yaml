@@ -1,0 +1,20 @@
+template_id: default_de_neutral
+language: DE
+length: normal
+tone: neutral-professionell
+mode: standard
+cv_selection: automatic
+cv_tailoring: true
+soft_skill_max: 3
+output_sections:
+  - letter
+  - evidence_map
+  - known_gaps
+  - requirements
+  - content_draft
+  - validation
+validation_rules:
+  length_ceiling_normal: 3000
+  length_floor_normal: 2000
+  max_same_tech_occurrences: 2
+  max_techs_per_paragraph: 3

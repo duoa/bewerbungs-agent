@@ -1,0 +1,36 @@
+{
+  "name": "Alex Mustermann",
+  "summary": "Senior software engineer with 8 years of experience in Python, data pipelines, and ML systems.",
+  "roles": [
+    {
+      "title": "Senior Data Engineer",
+      "company": "DataStream GmbH",
+      "start": "2021-03",
+      "end": null,
+      "responsibilities": [
+        "Designed and operated Apache Spark pipelines processing 5 TB/day",
+        "Led migration of legacy ETL system to dbt + Airflow, reducing pipeline failures by 40%",
+        "Mentored 3 junior engineers"
+      ]
+    },
+    {
+      "title": "Software Engineer",
+      "company": "Webtech AG",
+      "start": "2018-06",
+      "end": "2021-02",
+      "responsibilities": [
+        "Built REST APIs in Python (FastAPI) serving 200k daily active users",
+        "Introduced pytest-based test suite, raising coverage from 20% to 75%"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "M.Sc. Computer Science",
+      "institution": "TU Berlin",
+      "year": 2018
+    }
+  ],
+  "skills": ["Python", "SQL", "Apache Spark", "dbt", "Airflow", "FastAPI", "Docker", "Kubernetes"],
+  "languages": ["German (native)", "English (fluent)"]
+}

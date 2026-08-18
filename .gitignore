@@ -1,0 +1,55 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Secrets — never commit
+.env
+
+# Data directory — personal profile files.
+# Ignore everything under data/ EXCEPT the synthetic example fixtures,
+# which the tests and docs reference and must ship in the public repo.
+data/*
+!data/examples/
+
+# Run outputs
+outputs/
+
+# MLflow tracking store
+mlruns/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Type checking
+.mypy_cache/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Pinned lockfiles are committed — DO NOT ignore these
+# requirements.txt
+# requirements-dev.txt
+
+# Personal design notes — not for publication
+application_agent*.md
